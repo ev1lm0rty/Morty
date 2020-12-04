@@ -1,24 +1,47 @@
 #!/bin/bash
 
+smallwordlist=test.txt
+wordlist=test.txt
+resolvers=resolver.txt
+date=$(date +%d_%b_%Y)
+mkdir "Project_$1"
+cd "Project_$1"
+cp ../$1 .
 
-mkdir "$1_$date"
-cd "$1_$date"
-
+# top level subdomain scan
 for i in $(cat $1)
 do
     # amass subdomain scan
+    amass enum -active -df $i -o amass_$i.txt
+
     # subfinder subdomain scan
+    subfinder -d $i -nW -rL $resolvers -silent -nC -o subfinder_$i.txt
+
     # shuffle dns scan
-    # shuffle dns bruteforce scan
-    # third level domains (use small list)
+    shuffledns -d $i -nC -r $resolvers -silent -w $wordlist -o shuffle_$i.txt
+
     # combine all results 
-    # create a subdomains.txt file
+    cat *_$i.txt | sort | uniq >> temp.txt
+    rm -rf *_$i.txt
 done
+
+# third level domains (use small list)
+for i in $(cat temp.txt)
+do
+    shuffledn -d $i -nC -silent -w $smallwordlist -r $resolvers -o third_temp_$i.txt
+    cat *_$i.txt | sort | uniq >> temp.txt
+    rm -rf *_$i.txt
+done
+
+cat temp.txt | sort | uniq > subdomains.txt
+rm -rf temp.txt
 
 for i in $(cat subdomains.txt)
 do
     mkdir $i
+    cd $i
     echo "SCAN STARTED ON $date" > SCANDATE.txt
+
     # template scanning (nuclei)
     # subdomain takeover
     # port scanning (naabu)
@@ -39,6 +62,7 @@ do
     # vuln pattern search (gfpatterns)
     
     echo "SCAN COMPLETED ON $date" >> SCANDATE.txt
+    cd ..
 done
 
     
