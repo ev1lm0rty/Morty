@@ -21,7 +21,7 @@
 sudo apt update && sudo apt full-upgrade
 sudo apt install git vim nano tmux rlwrap \
     jq python3 python3-pip net-tools \
-    nmap gwak curl wget 
+    nmap gawk curl wget 
 
 # Installing virtualenv
 python3 -m pip install --user virtualenv
@@ -34,8 +34,7 @@ mkdir -p ~/go_projects/{bin,src,pkg}
 export GOPATH="$HOME/go_projects"
 export GOBIN="$GOPATH/bin"
 export PATH=$PATH:/usr/local/go/bin
-echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.bashrc
-echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.zshrc
+echo "export PATH=$PATH:/usr/local/go/bin:$GOBIN" >> ~/.bashrc
 echo 'export GOBIN="$GOPATH/bin"' >> ~/.bashrc
 echo 'export GOPATH="$HOME/go_projects"' >> ~/.bashrc
 rm -rf *.tar.gz
@@ -48,6 +47,12 @@ rm -rf *.tar.gz
 go get -u github.com/ffuf/ffuf
 
 # masscan
+cd /tmp
+sudo apt-get install git gcc make libpcap-dev
+git clone https://github.com/robertdavidgraham/masscan
+cd masscan
+make -j
+sudo mv bin/masscan /opt
 
 # shuffledns
 GO111MODULE=on go get -u -v github.com/projectdiscovery/shuffledns/cmd/shuffledns
@@ -99,7 +104,6 @@ virtualenv -p python3 env
 source env/bin/activate
 python3 -m pip install mmh3
 cd /tmp
-exit
 
 # jsscan
 # secretfinder
@@ -150,6 +154,6 @@ sudo git clone https://github.com/swisskyrepo/PayloadsAllTheThings
 
 # seclists
 cd /opt
-sudo wget "https://github.com/danielmiessler/SecLists/archive/master.zip"
-
-sudo reboot
+#sudo wget "https://github.com/danielmiessler/SecLists/archive/master.zip"
+#sudo unzip master.zip
+cd /tmp
