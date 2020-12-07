@@ -1,8 +1,7 @@
 #!/bin/bash
-
-smallwordlist=test.txt
-wordlist=test.txt
-resolvers=resolver.txt
+resolvers=/opt/resolvers.txt
+smallwordlist=/opt/SecLists-master/Discovery/DNS/deepmagic.com-prefixes-top500.txt
+wordlist=/opt/SecLists-master/Discovery/DNS/dns-Jhaddix.txt
 date=$(date +%d_%b_%Y)
 mkdir "Project_$1"
 cd "Project_$1"
@@ -36,6 +35,14 @@ done
 cat temp.txt | sort | uniq > subdomains.txt
 rm -rf temp.txt
 
+# Subdomains to IP
+cat subdomains.txt | while read domain
+do
+	dig +short $domain |grep -E "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" >> tempip.txt
+done
+
+cat tempip.txt | sort | uniq > ip.txt && rm -rf tempip.txt
+
 for i in $(cat subdomains.txt)
 do
     mkdir $i
@@ -45,7 +52,12 @@ do
     # template scanning (nuclei)
     # subdomain takeover
     # port scanning (naabu)
+    sudo naabu -h $i -o portscan.txt -no-color 
+
     # url extraction (waybackurl , gao)
+    waybackurls $i >> urls.txt
+    gau -subs $i >> urls.txt
+
     # parameter discovery (paramspider)
         # xss (delfox) 
     # github scanning (githound) 
@@ -58,7 +70,11 @@ do
     # github dork list (jhaddix script)
     # google dork list (custom script)
     # whatweb
+    whatweb $i >> whatweb.txt
+
     # probing (httpx)
+    httpx -silent -title -status-code $i > url_probe.txt
+
     # vuln pattern search (gfpatterns)
     
     echo "SCAN COMPLETED ON $date" >> SCANDATE.txt

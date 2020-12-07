@@ -157,3 +157,6 @@ cd /opt
 #sudo wget "https://github.com/danielmiessler/SecLists/archive/master.zip"
 #sudo unzip master.zip
 cd /tmp
+
+cd /opt
+sudo wget https://github.com/janmasarik/resolvers/raw/master/resolvers.txt
