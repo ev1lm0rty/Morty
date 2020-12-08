@@ -65,6 +65,15 @@ sudo mv amass* /opt
 echo "export PATH=$PATH:/opt/amass_linux_amd64" >> ~/.bashrc
 echo "export PATH=$PATH:/opt/amass_linux_amd64" >> ~/.zshrc
 
+# subfinder
+GO111MODULE=on go get -u -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder
+
+# massdns
+cd /tmp
+git clone https://github.com/blechschmidt/massdns
+cd massdns
+make
+sudo cp bin/massdns /opt
 
 # nuclei
 GO111MODULE=on go get -u -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei
@@ -99,10 +108,8 @@ cd /tmp
 
 # favfreak
 git clone https://github.com/devanshbatham/FavFreak
-cd FavFreak
-virtualenv -p python3 env
-source env/bin/activate
 python3 -m pip install mmh3
+sudo mv FavFreak /opt
 cd /tmp
 
 # jsscan
