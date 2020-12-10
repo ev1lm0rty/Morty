@@ -21,7 +21,7 @@
 sudo apt update && sudo apt full-upgrade
 sudo apt install git vim nano tmux rlwrap \
     jq python3 python3-pip net-tools \
-    nmap gawk curl wget fping
+    nmap gawk curl wget fping toilet -y
 
 # Installing virtualenv
 python3 -m pip install --user virtualenv
@@ -175,7 +175,6 @@ cd ..
 rm -rf gobuster
 
 ## Wordlists and Payloads
-
 # payloadallthings
 cd /opt
 sudo git clone https://github.com/swisskyrepo/PayloadsAllTheThings

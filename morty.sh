@@ -8,15 +8,24 @@ fuzzword=/opt/SecLists-master/Discovery/Web-Content/raft-small-words.txt
 templatefile=/opt/nuclei.txt
 eye=/opt/EyeWitness/Python/EyeWitness.py
 date=$(date +%d_%b_%Y)
-mkdir "Project_$1"
+
+if [[ ! -d "Project_$1" ]]
+then
+  mkdir "Project_$1"
+fi
+
 cd "Project_$1"
 cp ../$1 .
+
 nuclei -update-templates
-find ~/nuclei-templates -type f | grep .yaml| grep -v pre-commit-config > /tmp/nuclei.txt
+find ~/nuclei-templates -type f -not -path '*/\.*' | grep .yaml > /tmp/nuclei.txt
 sudo cp /tmp/nuclei.txt /opt
+
 gf -list > /tmp/gf.txt
 sudo mv /tmp/gf.txt /opt
+
 clear
+
 #-----------------------------------------------#
 
 subdomain_scan() {
@@ -26,9 +35,9 @@ subdomain_scan() {
 
     for i in $(cat $1)
     do
-        echo "#------------------------------------#"
+        echo "#~~~~~~~~~~#"
         echo $i
-        echo "#------------------------------------#"
+        echo "#~~~~~~~~~~#"
         # amass enum -active -d $i -o amass_$i.txt -timeout 10
         subfinder -silent -d $i -timeout 10 -t 100 -nW -nC -o subfinder_$i.txt
         shuffledns -massdns /opt/massdns -d $i -nC -r $resolvers -silent -w $wordlist -o shuffle_$i.txt
@@ -45,9 +54,9 @@ third_level() {
 
     for i in $(cat temp.txt)
     do
-        echo "#------------------------------------#"
+        echo "#~~~~~~~~~~#"
         echo $i
-        echo "#------------------------------------#"
+        echo "#~~~~~~~~~~#"
         shuffledns -massdns /opt/massdns -d $i -nC -silent -w $smallwordlist -r $resolvers -o third_temp_$i.txt
         cat *_$i.txt | sort | uniq >> temp.txt
         rm -rf *_$i.txt
@@ -122,34 +131,61 @@ dirfuzz(){
 }
 
 port_scan(){
-  sudo $naabu -iL ip.txt -p - -nC -o portscan.txt -nmap
+    echo "#------------------------------------#"
+    echo "PORT SCAN"
+    echo "#------------------------------------#"
+    sudo $naabu -iL ip.txt -p - -nC -o portscan.txt -nmap
 }
 
 s3_scan(){
-  python3 /opt/S3Scanner/s3scanner.py -l subdomains.txt -o buckets.txt
+    echo "#------------------------------------#"
+    echo "S3 SCAN"
+    echo "#------------------------------------#"
+    python3 /opt/S3Scanner/s3scanner.py -l subdomains.txt -o buckets.txt
 }
 
 pattern_search(){
-  mkdir pattern
-  for i in $(cat /opt/gf.txt)
-  do
-    cat urls.txt paramspider.txt | gf $i > pattern/${i}.txt
-  done
+    echo "#------------------------------------#"
+    echo "PATTERN SEARCH" 
+    echo "#------------------------------------#" 
+    mkdir pattern
+    for i in $(cat /opt/gf.txt)
+    do
+      cat urls.txt paramspider.txt | gf $i > pattern/${i}.txt
+    done
 }
 
 screen_shot(){
-  python3 $eye -d $1_SCREEN -f subdomains.txt
+    echo "#------------------------------------#"
+    echo "SCREENSHOT" 
+    echo "#------------------------------------#" 
+    python3 $eye -d $1_SCREEN -f subdomains.txt
 }
 
 main(){
-    #subdomain_scan $1
-    #third_level
-    #sub_to_ip
-    #s3_scan
+   toilet -f pagga --metal "MORTY SCAN"
+   if [[ ! -f subdomains.txt ]]
+   then
+    subdomain_scan $1
+    third_level
+   fi
+
+   if [[ ! -f ip.txt ]]
+   then
+    sub_to_ip
+   fi
+
+   if [[ ! -f buckets.txt ]]
+   then
+    s3_scan
+   fi
+
     #screen_shot $1
 
     for i in $(cat subdomains.txt)
     do
+      if [[ ! -f $i/COMPLETED ]]
+      then
         mkdir $i
         cd $i
         url_extract
@@ -159,7 +195,9 @@ main(){
         favicon_scan
         dirfuzz $i
         pattern_search
+        touch COMPLETED
         cd ..
+      fi
     done
     port_scan
 }
