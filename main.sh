@@ -2,15 +2,16 @@
 #--------------------------------------------------------------------#
 resolvers=/opt/resolvers.txt
 smallwordlist=/opt/SecLists-master/Discovery/DNS/deepmagic.com-prefixes-top500.txt
-wordlist=/opt/SecLists-master/Discovery/DNS/dns-Jhaddix.txt
+wordlist=/opt/SecLists-master/Discovery/DNS/subdomains-top1million-20000.txt
 templatefile=/opt/nuclei.txt
 date=$(date +%d_%b_%Y)
 mkdir "Project_$1"
 cd "Project_$1"
 cp ../$1 .
 nuclei -update-templates
-find ~/nuclei-templates -type f |z grep .yaml > /tmp/nuclei.txt
+find ~/nuclei-templates -type f | grep .yaml > /tmp/nuclei.txt
 sudo cp /tmp/nuclei.txt /opt
+clear
 #--------------------------------------------------------------------#
 
 echo "#------------------------------------#"
@@ -24,10 +25,10 @@ do
     echo "#------------------------------------#"
     
     # AMASS
-    amass enum -active -d $i -o amass_$i.txt
+    #amass enum -active -d $i -o amass_$i.txt -timeout 10
     
     # SUBFINDER
-    subfinder -d $i -nW -rL $resolvers -silent -nC -o subfinder_$i.txt
+    subfinder -silent -d $i -timeout 10 -t 100 -nC -o subfinder_$i.txt
 
     # SHFFLEDNS
     shuffledns -massdns /opt/massdns -d $i -nC -r $resolvers -silent -w $wordlist -o shuffle_$i.txt
@@ -56,6 +57,10 @@ rm -rf temp.txt
 #--------------------------------------------------------------------#
 
 # SUBDOMAIN TO IP
+echo "#------------------------------------#"
+echo "SUBDOMAIN TO IP"
+echo "#------------------------------------#"
+
 cat subdomains.txt | while read domain
 do
 	dig +short $domain |grep -E "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" >> tempip.txt
@@ -77,45 +82,46 @@ do
     cd $i
     echo "SCAN STARTED ON $date" > SCANDATE.txt
 
-    echo "------------TEMPLATE SCANNING-------------"
-    cat $templatefile | while read line
-    do
-      nuclei -target $line -silent -t $line >> template_scan.txt
-      echo "------------------" >> template_scan.txt
-    done
 
     echo "------------URL EXTRACTION-------------"
     waybackurls $i >> urls.txt
     gau -subs $i >> urls.txt
 
+    echo "------------PROBING-------------"
+    cat urls.txt | httpx -silent -title -status-code  -fc 404 -o httpx.txt
+    
     echo "------------PARAMETER DISCOVERY-------------"
-    python3 /opt/ParamSpider/paramspider.py --level high -d $i -o paramspider.txt
-    mkdir dalfox
-    for url in $(cat paramspider.txt urls.txt)
-    do
-      dalfox url $url -o dalfox/dalfox.txt
-    done
+    python3 /opt/ParamSpider/paramspider.py --level high -d $i -o $(pwd)/paramspider.txt
 
-    echo "------------GITHOUND-------------"
-    # 
+    echo "------------DALFOX-------------" 
+    cat paramspider.txt httpx.txt > dalurls.txt 
+    #dalfox file dalurls.txt -o $(pwd)/dalfox.txt 
+    #mkdir dalfox #for url in $(cat paramspider.txt httpx.txt) #do
+    # dalfox url $url -o dalfox/dalfox.txt
+    #done
+
+    echo "------------TEMPLATE SCANNING-------------"
+
+    cat $templatefile | while read line
+    do
+      nuclei -l dalurls.txt -silent -t $line >> template_scan.txt
+      echo "------------------" >> template_scan.txt
+    done
+    #echo "------------GITHOUND-------------"
 
     echo "------------FAVICON SCANNING-------------" 
-    cat paramspider.txt urls.txt | python3 /opt/FavFreak/favfreak.py -o favfreak.txt
+    cat paramspider.txt httpx.txt | python3 /opt/FavFreak/favfreak.py -o favfreak.txt
 
     # javascript (jsscan)
     #
     # secret finding (secretfinder)
     #
     # directory scanning (dirsearch)
-    python3 /opt/dirsearch/dirsearch.py -R 1 -u $i -o dirsearch.txt 
-    
+    python3 /opt/dirsearch/dirsearch.py -R 1 -u $i --simple-report=$(pwd)/dirsearch.txt
     # s3 bucket scan (s3bucketscan.py)
     #
-    echo "------------PROBING-------------"
-    httpx -silent -title -status-code $i > httpx.txt
 
-    echo "------------GF-PATTERNS-------------"
-    #
+    #echo "------------GF-PATTERNS-------------"
 
     echo "SCAN COMPLETED ON $date" >> SCANDATE.txt
     cd ..
