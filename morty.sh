@@ -10,6 +10,10 @@ date=$(date +%d_%b_%Y)
 mkdir "Project_$1"
 cd "Project_$1"
 cp ../$1 .
+nuclei -update-templates
+find ~/nuclei-templates -type f | grep .yaml > /tmp/nuclei.txt
+sudo cp /tmp/nuclei.txt /opt
+clear
 #-----------------------------------------------#
 
 subdomain_scan() {
@@ -63,28 +67,33 @@ sub_to_ip() {
 }
 
 url_extract() {
-    echo "------------URL EXTRACTION-------------"
+    echo "#------------------------------------#"
+    echo "URL EXTRACTION"
+    echo "#------------------------------------#"
     waybackurls $i >> urls.txt
     gau -subs $i >> urls.txt
     cat urls.txt | httpx -silent -title -status-code -content-length -fc 404 -o httpx.txt
 }
 
 param_discover(){
-    echo "------------PARAMETER DISCOVERY-------------"
+    echo "#------------------------------------#"
+    echo "PARAMETER DISCOVERY"
+    echo "#------------------------------------#"
     python3 /opt/ParamSpider/paramspider.py --level high -d $i -o $(pwd)/paramspider.txt
 }
 
 dal_fox(){
-    echo "------------DALFOX-------------" 
+    echo "#------------------------------------#"
+    echo "XSS SCAN"
+    echo "#------------------------------------#"
     cat paramspider.txt httpx.txt > dalurls.txt 
     dalfox file dalurls.txt -o $(pwd)/dalfox.txt 
 }
 
 template_scan(){
-    nuclei -update-templates
-    find ~/nuclei-templates -type f | grep .yaml > /tmp/nuclei.txt
-    sudo cp /tmp/nuclei.txt /opt
-     echo "------------TEMPLATE SCANNING-------------"
+    echo "#------------------------------------#"
+    echo "TEMPLATE SCAN"
+    echo "#------------------------------------#"
 
     cat $templatefile | while read line
     do
@@ -94,33 +103,37 @@ template_scan(){
 }
 
 favicon_scan(){
-     echo "------------FAVICON SCANNING-------------" 
+    echo "#------------------------------------#"
+    echo "FAVICON SCAN"
+    echo "#------------------------------------#"
     cat paramspider.txt httpx.txt | python3 /opt/FavFreak/favfreak.py -o favfreak.txt
 }
 
 dirfuzz(){
-    echo  echo "------------FAVICON SCANNING-------------" 
-    ffuf -u $1/FUZZ -w $fuzzword -o $1_ffuf.txt
+    echo "#------------------------------------#"
+    echo "DIR FUZZING"
+    echo "#------------------------------------#"
+    ffuf -u  $1/FUZZ -w $fuzzword -o $1_ffuf.txt
 }
+
 
 main(){
-    url_extract
-    param_discover
-    dal_fox
-    template_scan
-    favicon_scan
-    dirfuzz $1
+    subdomain_scan $1
+    third_level
+    sub_to_ip
+
+    for i in $(cat subdomains.txt)
+    do
+        mkdir $i
+        cd $i
+        url_extract
+        param_discover
+        dal_fox
+        template_scan
+        favicon_scan
+        dirfuzz $i
+        cd ..
+    done
 }
 
-
-subdomain_scan
-third_level
-sub_to_ip
-
-for i in $(cat subdomains.txt)
-do
-    mkdir $i
-    cd $i
-    main $i
-    cd ..
-done
+main $1
