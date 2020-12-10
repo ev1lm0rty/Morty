@@ -166,6 +166,14 @@ sudo mv EyeWitness /opt
 cd /opt/EyeWitness/setup
 sudo bash setup.sh
 
+# Gobuster
+git clone https://github.com/OJ/gobuster
+cd gobuster
+make
+sudo mv gobuster /opt
+cd ..
+rm -rf gobuster
+
 ## Wordlists and Payloads
 
 # payloadallthings

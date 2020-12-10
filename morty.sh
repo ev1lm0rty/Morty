@@ -117,8 +117,8 @@ dirfuzz(){
     echo "#------------------------------------#"
     echo "DIR FUZZING"
     echo "#------------------------------------#"
-    ffuf -s -u  https://$1/FUZZ -w $fuzzword -o $1_ffuf.txt
-    ffuf -s -u http://$1/FUZZ -w $fuzzword -o $1_ffuf_http.txt
+    #ffuf -s -u  https://$1/FUZZ -w $fuzzword -o $1_ffuf.txt
+    /opt/gobuster dir -u $1 -w $fuzzword -o $1_gobuster.txt -q -t 100 
 }
 
 port_scan(){
@@ -133,7 +133,7 @@ pattern_search(){
   mkdir pattern
   for i in $(cat /opt/gf.txt)
   do
-    cat urls.txt paramspider | gf $i > pattern/${i}.txt
+    cat urls.txt paramspider.txt | gf $i > pattern/${i}.txt
   done
 }
 
@@ -142,11 +142,11 @@ screen_shot(){
 }
 
 main(){
-    subdomain_scan $1
-    third_level
-    sub_to_ip
-    s3_scan
-    screen_shot $1
+    #subdomain_scan $1
+    #third_level
+    #sub_to_ip
+    #s3_scan
+    #screen_shot $1
 
     for i in $(cat subdomains.txt)
     do
