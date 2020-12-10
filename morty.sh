@@ -4,15 +4,18 @@
 resolvers=/opt/resolvers.txt
 smallwordlist=/opt/SecLists-master/Discovery/DNS/deepmagic.com-prefixes-top500.txt
 wordlist=/opt/SecLists-master/Discovery/DNS/subdomains-top1million-20000.txt
-fuzzword=/opt/SecLists-master/Discovery/Web
+fuzzword=/opt/SecLists-master/Discovery/Web-Content/raft-small-words.txt
 templatefile=/opt/nuclei.txt
+eye=/opt/EyeWitness/Python/EyeWitness.py
 date=$(date +%d_%b_%Y)
 mkdir "Project_$1"
 cd "Project_$1"
 cp ../$1 .
 nuclei -update-templates
-find ~/nuclei-templates -type f | grep .yaml > /tmp/nuclei.txt
+find ~/nuclei-templates -type f | grep .yaml| grep -v pre-commit-config > /tmp/nuclei.txt
 sudo cp /tmp/nuclei.txt /opt
+gf -list > /tmp/gf.txt
+sudo mv /tmp/gf.txt /opt
 clear
 #-----------------------------------------------#
 
@@ -27,7 +30,7 @@ subdomain_scan() {
         echo $i
         echo "#------------------------------------#"
         # amass enum -active -d $i -o amass_$i.txt -timeout 10
-        subfinder -silent -d $i -timeout 10 -t 100 -nC -o subfinder_$i.txt
+        subfinder -silent -d $i -timeout 10 -t 100 -nW -nC -o subfinder_$i.txt
         shuffledns -massdns /opt/massdns -d $i -nC -r $resolvers -silent -w $wordlist -o shuffle_$i.txt
         cat *_$i.txt | sort | uniq >> temp.txt
         rm -rf *_$i.txt
@@ -72,7 +75,8 @@ url_extract() {
     echo "#------------------------------------#"
     waybackurls $i >> urls.txt
     gau -subs $i >> urls.txt
-    cat urls.txt | httpx -silent -title -status-code -content-length -fc 404 -o httpx.txt
+    cat urls.txt | httpx -no-color -silent -title -status-code -content-length -fc 404 -o httpx.txt
+
 }
 
 param_discover(){
@@ -86,41 +90,63 @@ dal_fox(){
     echo "#------------------------------------#"
     echo "XSS SCAN"
     echo "#------------------------------------#"
-    cat paramspider.txt httpx.txt > dalurls.txt 
-    dalfox file dalurls.txt -o $(pwd)/dalfox.txt 
+    dalfox file urls.txt -o $(pwd)/dalfox.txt 
 }
 
 template_scan(){
     echo "#------------------------------------#"
     echo "TEMPLATE SCAN"
     echo "#------------------------------------#"
-
-    cat $templatefile | while read line
+    mkdir template_scan
+    cd template_scan
+    for line in $(cat /opt/nuclei.txt) 
     do
-      nuclei -l dalurls.txt -silent -t $line >> template_scan.txt
-      echo "------------------" >> template_scan.txt
+      nuclei -l ../urls.txt -silent -t $line -no-color -o ${line}_scan.txt
     done
+    cd ..
 }
 
 favicon_scan(){
     echo "#------------------------------------#"
     echo "FAVICON SCAN"
     echo "#------------------------------------#"
-    cat paramspider.txt httpx.txt | python3 /opt/FavFreak/favfreak.py -o favfreak.txt
+    cat urls.txt | python3 /opt/FavFreak/favfreak.py -o favfreak.txt
 }
 
 dirfuzz(){
     echo "#------------------------------------#"
     echo "DIR FUZZING"
     echo "#------------------------------------#"
-    ffuf -u  $1/FUZZ -w $fuzzword -o $1_ffuf.txt
+    ffuf -s -u  https://$1/FUZZ -w $fuzzword -o $1_ffuf.txt
+    ffuf -s -u http://$1/FUZZ -w $fuzzword -o $1_ffuf_http.txt
 }
 
+port_scan(){
+  sudo $naabu -iL ip.txt -p - -nC -o portscan.txt -nmap
+}
+
+s3_scan(){
+  python3 /opt/S3Scanner/s3scanner.py -l subdomains.txt -o buckets.txt
+}
+
+pattern_search(){
+  mkdir pattern
+  for i in $(cat /opt/gf.txt)
+  do
+    cat urls.txt paramspider | gf $i > pattern/${i}.txt
+  done
+}
+
+screen_shot(){
+  python3 $eye -d $1_SCREEN -f subdomains.txt
+}
 
 main(){
     subdomain_scan $1
     third_level
     sub_to_ip
+    s3_scan
+    screen_shot $1
 
     for i in $(cat subdomains.txt)
     do
@@ -132,8 +158,10 @@ main(){
         template_scan
         favicon_scan
         dirfuzz $i
+        pattern_search
         cd ..
     done
+    port_scan
 }
 
 main $1

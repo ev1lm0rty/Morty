@@ -21,7 +21,7 @@
 sudo apt update && sudo apt full-upgrade
 sudo apt install git vim nano tmux rlwrap \
     jq python3 python3-pip net-tools \
-    nmap gawk curl wget 
+    nmap gawk curl wget fping
 
 # Installing virtualenv
 python3 -m pip install --user virtualenv
@@ -146,12 +146,25 @@ go get -u github.com/tomnomnom/waybackurls
 mkdir ~/.gf
 cp -r $GOPATH/src/github.com/tomnomnom/gf/examples ~/.gf
 git clone https://github.com/1ndianl33t/Gf-Patterns
-mv ~/Gf-Patterns/*.json ~/.gf
+mv Gf-Patterns/*.json ~/.gf
+rm -rf Gf-Patterns
 
 # whatweb
 sudo apt install whatweb
 
+# s3scanner
+cd /tmp
+git clone https://github.com/sa7mon/S3Scanner
+cd S3Scanner
+pip3 install -r requirements.txt
+cd ..
+sudo mv S3Scanner /opt
 #------------------------------#
+# Eyewitness
+git clone https://github.com/FortyNorthSecurity/EyeWitness
+sudo mv EyeWitness /opt
+cd /opt/EyeWitness/setup
+sudo bash setup.sh
 
 ## Wordlists and Payloads
 
