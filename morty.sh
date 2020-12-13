@@ -240,9 +240,9 @@ main(){
 
     if [[ ! -f portscan.txt ]]
     then
-    port_scan
+      port_scan
     fi
-
+    rm -rf gecko* SCREEN S3
     cd ..
     zip -r $1.zip Project_$1
 }
