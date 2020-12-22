@@ -3,8 +3,8 @@
 #-----------------------------------------------#
 resolvers=/opt/resolvers.txt
 smallwordlist=/opt/SecLists-master/Discovery/DNS/deepmagic.com-prefixes-top500.txt
-wordlist=/opt/SecLists-master/Discovery/DNS/subdomains-top1million-20000.txt
-fuzzword=/opt/SecLists-master/Discovery/Web-Content/raft-small-words.txt
+wordlist=opt/SecLists-master/Discovery/DNS/dns-Jhaddix.txt
+fuzzword=/opt/SecLists-master/Discovery/Web-Content/raft-large-words.txt
 templatefile=/opt/nuclei.txt
 eye=/opt/EyeWitness/Python/EyeWitness.py
 date=$(date +%d_%b_%Y)
@@ -22,8 +22,8 @@ subdomain_scan() {
         echo $i
         echo "#~~~~~~~~~~#"
         # amass enum -active -d $i -o amass_$i.txt -timeout 10
-        subfinder -silent -d $i -timeout 10 -t 100 -nW -nC -o subfinder_$i.txt
-        shuffledns -massdns /opt/massdns -d $i -nC -r $resolvers -silent -w $wordlist -o shuffle_$i.txt
+        subfinder -silent -d $i -timeout 10 -t 100 -nW -nC -o subfinder_$i.txt 2>/dev/null
+        shuffledns -massdns /opt/massdns -d $i -nC -r $resolvers -silent -w $wordlist -o shuffle_$i.tx  2>/dev/null
         cat *_$i.txt | sort | uniq >> temp.txt
         rm -rf *_$i.txt
     done
@@ -35,18 +35,9 @@ third_level() {
     echo "RUNNING THIRD LEVEL SUBDOMAIN SCAN"
     echo "#------------------------------------#"
 
-    for i in $(cat temp.txt)
-    do
-        echo "#~~~~~~~~~~#"
-        echo $i
-        echo "#~~~~~~~~~~#"
-        shuffledns -massdns /opt/massdns -d $i -nC -silent -w $smallwordlist -r $resolvers -o third_temp_$i.txt
-        cat *_$i.txt | sort | uniq >> temp.txt
-        rm -rf *_$i.txt
-    done
-
-    cat temp.txt | sort | uniq > subdomains.txt
-    rm -rf temp.txt
+    shuffledns -massdns /opt/massdns -list temp.txt -nC -silent -w $smallwordlist -r $resolvers -o third_temp.txt  2>/dev/null
+    cat third_temp.txt temp.txt | sort | uniq > subdomains.txt
+    rm -rf temp.txt third_temp.txt
 }
 
 sub_to_ip() {
@@ -68,7 +59,7 @@ url_extract() {
     waybackurls -no-subs $i >> raw_urls.txt
     gau $i >> raw_urls.txt
     cat raw_urls.txt | sort | uniq | gf files > urls.txt
-    cat urls.txt | httpx -no-color -silent -title -status-code -content-length -fc 404 -o httpx.txt
+    cat urls.txt | httpx -no-color -silent -title -status-code -content-length -fc 404 -o httpx.txt  2>/dev/null
     touch URL
 
 }
@@ -77,7 +68,7 @@ param_discover(){
     echo "#------------------------------------#"
     echo "PARAMETER DISCOVERY ( $1 )"
     echo "#------------------------------------#"
-    python3 /opt/ParamSpider/paramspider.py --level high -d $i -o $(pwd)/paramspider.txt
+    python3 /opt/ParamSpider/paramspider.py --level high -d $i -o $(pwd)/paramspider.txt  2>/dev/null
     touch PARAM
 }
 
@@ -118,14 +109,17 @@ port_scan(){
     echo "#------------------------------------#"
     echo "PORT SCAN "
     echo "#------------------------------------#"
-    sudo $naabu -iL ip.txt -p - -nC -o portscan.txt -nmap
+    #sudo $naabu -iL ip.txt -p - -nC -o portscan.txt -nmap
+    sudo masscan -iL ip.txt -p 1-65535 -oL portscan.txt --rate=1000 -Pn 2>/dev/null
+
 }
 
 s3_scan(){
     echo "#------------------------------------#"
     echo "S3 SCAN ( $1 )"
     echo "#------------------------------------#"
-    python3 /opt/S3Scanner/s3scanner.py -l subdomains.txt -o buckets.txt
+    python3 /opt/S3Scanner/s3scanner.py -l subdomains.txt -o buckets.txt 2>/dev/null
+
     touch S3
 }
 
@@ -145,7 +139,7 @@ screen_shot(){
     echo "#------------------------------------#"
     echo "SCREENSHOT ( $1 )" 
     echo "#------------------------------------#" 
-    python3 $eye -d $1_EYE -f subdomains.txt --no-prompt
+    python3 $eye -d $1_EYE -f subdomains.txt --no-prompt --threads 100 --max-retries 0 2>/dev/null 
     touch SCREEN
 }
 
@@ -154,7 +148,7 @@ secret_find(){
     echo "SECRETFINDER ( $1 )" 
     echo "#------------------------------------#" 
     cat *.txt | grep .js > js.txt
-    python3 /opt/secretfinder/SecretFinder.py -i js.txt -o secretfinder.html
+    python3 /opt/secretfinder/SecretFinder.py -i js.txt -o secretfinder.html 2>/dev/null 
     touch SECRET
 }
 
@@ -174,7 +168,7 @@ main(){
 
    if [[ ! -f buckets.txt ]]
    then
-    s3_scan
+    s3_scan $1
    fi
 
    if [[ ! -f SCREEN ]]
@@ -204,7 +198,8 @@ main(){
 
         if [[ ! -f DALFOX ]]
         then
-         dal_fox $i  &
+         #dal_fox $i  &
+         ecoh "Dalfox Not Configured Right Now"
         fi
 
         if [[ ! -f TEMPLATE ]]

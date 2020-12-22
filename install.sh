@@ -21,7 +21,7 @@
 sudo apt update && sudo apt full-upgrade
 sudo apt install git vim nano tmux rlwrap \
     jq python3 python3-pip net-tools \
-    nmap gawk curl wget fping toilet -y
+    nmap gawk curl wget fping toilet masscan -y
 
 # Installing virtualenv
 python3 -m pip install --user virtualenv
