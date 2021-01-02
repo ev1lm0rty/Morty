@@ -76,7 +76,8 @@ dal_fox(){
     echo "#------------------------------------#"
     echo "XSS SCAN ( $1 )"
     echo "#------------------------------------#"
-    dalfox file urls.txt -o $(pwd)/dalfox.txt -w 1000
+    #dalfox file urls.txt -o $(pwd)/dalfox.txt -w 1000
+    cat urls.txt | /opt/kxss | gf files | dalfox pipe -w 1000 -o $(pwd)/dalfox.txt
     touch DALFOX
 }
 
@@ -152,6 +153,11 @@ secret_find(){
     touch SECRET
 }
 
+cleanup(){
+  find . -empty > DELETED_EMPTYFILES.txt
+  find . -empty -delete
+}
+
 main(){
    toilet -f pagga --metal "MORTY SCAN"
 
@@ -198,8 +204,7 @@ main(){
 
         if [[ ! -f DALFOX ]]
         then
-         #dal_fox $i  &
-         ecoh "Dalfox Not Configured Right Now"
+         dal_fox $i  &
         fi
 
         if [[ ! -f TEMPLATE ]]
@@ -238,6 +243,7 @@ main(){
       port_scan
     fi
     rm -rf gecko* SCREEN S3
+    cleanup
     cd ..
     zip -r $1.zip Project_$1
 }
