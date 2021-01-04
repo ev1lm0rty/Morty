@@ -21,7 +21,7 @@
 sudo apt update && sudo apt full-upgrade
 sudo apt install git vim nano tmux rlwrap \
     jq python3 python3-pip net-tools \
-    nmap gawk curl wget fping toilet masscan -y
+    nmap gawk curl wget fping toilet masscan chromium-browser -y
 
 # Installing virtualenv
 python3 -m pip install --user virtualenv
@@ -165,6 +165,12 @@ git clone https://github.com/FortyNorthSecurity/EyeWitness
 sudo mv EyeWitness /opt
 cd /opt/EyeWitness/setup
 sudo bash setup.sh
+
+# Aquatone
+cd /tmp
+wget "https://github.com/michenriksen/aquatone/releases/download/v1.7.0/aquatone_linux_amd64_1.7.0.zip"
+unzip *.zip
+sudo mv aquatone /opt
 
 # Gobuster
 git clone https://github.com/OJ/gobuster

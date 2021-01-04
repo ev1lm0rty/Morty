@@ -16,17 +16,15 @@ subdomain_scan() {
     echo "#------------------------------------#"
     echo "RUNNING SUBDOMAIN SCAN"
     echo "#------------------------------------#"
-    for i in $(cat $1)
-    do
-        echo "#~~~~~~~~~~#"
-        echo $i
-        echo "#~~~~~~~~~~#"
-        # amass enum -active -d $i -o amass_$i.txt -timeout 10
-        subfinder -silent -d $i -timeout 10 -t 100 -nW -nC -o subfinder_$i.txt 2>/dev/null
-        shuffledns -massdns /opt/massdns -d $i -nC -r $resolvers -silent -w $wordlist -o shuffle_$i.tx  2>/dev/null
-        cat *_$i.txt | sort | uniq >> temp.txt
-        rm -rf *_$i.txt
-    done
+
+    #amass enum -active -df $1 -o amass.txt -timeout 1 -max-dns-queries 150 -noresolvrate 
+    subfinder -silent -dL $1 -timeout 5 -t 100 -nW -nC -o subfinder.txt &
+    shuffledns -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -w $wordlist -o shuffle.txt &
+
+    wait
+
+    cat amass.txt subfinder.txt shuffle.txt 2>/dev/null | sort | uniq >> temp.txt
+    rm -rf amass.txt subfinder.txt shuffle.txt
 
 }
 
@@ -37,6 +35,8 @@ third_level() {
 
     shuffledns -massdns /opt/massdns -list temp.txt -nC -silent -w $smallwordlist -r $resolvers -o third_temp.txt  2>/dev/null
     cat third_temp.txt temp.txt | sort | uniq > subdomains.txt
+    comm -23 <(sort subdomains.txt) <(sort out_of_scope.txt) > mm.txt
+    mv mm.txt subdomains.txt
     rm -rf temp.txt third_temp.txt
 }
 
@@ -56,6 +56,7 @@ url_extract() {
     echo "#------------------------------------#"
     echo "URL EXTRACTION ( $1 )"
     echo "#------------------------------------#"
+
     waybackurls -no-subs $i >> raw_urls.txt
     gau $i >> raw_urls.txt
     cat raw_urls.txt | sort | uniq | gf files > urls.txt
@@ -68,7 +69,7 @@ param_discover(){
     echo "#------------------------------------#"
     echo "PARAMETER DISCOVERY ( $1 )"
     echo "#------------------------------------#"
-    python3 /opt/ParamSpider/paramspider.py --level high -d $i -o $(pwd)/paramspider.txt  2>/dev/null
+    python3 /opt/ParamSpider/paramspider.py --level high -d $i -o $(pwd)/paramspider.txt  2>/dev/null >/dev/null
     touch PARAM
 }
 
@@ -76,8 +77,7 @@ dal_fox(){
     echo "#------------------------------------#"
     echo "XSS SCAN ( $1 )"
     echo "#------------------------------------#"
-    #dalfox file urls.txt -o $(pwd)/dalfox.txt -w 1000
-    cat urls.txt paramspider.txt | sort | uniq | /opt/kxss | awk '{print $NF}' | gf files | sed 's/=.*/=/' | dalfox pipe -w 1000 -o $(pwd)/dalfox.txt
+    cat urls.txt paramspider.txt | sort | uniq | /opt/kxss | awk '{print $NF}' | gf files | sed 's/=.*/=/' | dalfox pipe -w 1000 --silence -o $(pwd)/dalfox.txt
     touch DALFOX
 }
 
@@ -93,7 +93,7 @@ favicon_scan(){
     echo "#------------------------------------#"
     echo "FAVICON SCAN ( $1 )"
     echo "#------------------------------------#"
-    cat urls.txt | python3 /opt/FavFreak/favfreak.py -o favfreak.txt 2>/dev/null
+    cat urls.txt | python3 /opt/FavFreak/favfreak.py -o favfreak.txt 2>/dev/null >/dev/null
     touch FAV
 }
 
@@ -101,7 +101,6 @@ dirfuzz(){
     echo "#------------------------------------#"
     echo "DIR FUZZING ( $1 )"
     echo "#------------------------------------#"
-    #ffuf -s -u  https://$1/FUZZ -w $fuzzword -o $1_ffuf.txt
     /opt/gobuster dir -u $1 -w $fuzzword -o $1_gobuster.txt -q -t 100 
     touch FUZZ
 }
@@ -140,7 +139,9 @@ screen_shot(){
     echo "#------------------------------------#"
     echo "SCREENSHOT ( $1 )" 
     echo "#------------------------------------#" 
-    python3 $eye -d $1_EYE -f subdomains.txt --no-prompt --threads 100 --max-retries 0 2>/dev/null 
+    #python3 $eye -d $1_EYE -f subdomains.txt --no-prompt --threads 100 --max-retries 0 2>/dev/null 
+    mkdir AQUATONE
+    cat subdomains.txt | /opt/aquatone -out ./AQUATONE -silent -threads 100
     touch SCREEN
 }
 
@@ -160,6 +161,10 @@ cleanup(){
 
 main(){
    toilet -f pagga --metal "MORTY SCAN"
+   echo "--------------------------------------"
+   echo
+   echo "#~~~~~~~~( $1 )~~~~~~~~#"
+   echo
 
    if [[ ! -f subdomains.txt ]]
    then
@@ -259,6 +264,7 @@ else
 
   cd "Project_$1" 2> /dev/null
   cp ../$1 . 2> /dev/null
+  cp ../out_of_scope.txt . 2>/dev/null
 
   nuclei -update-templates -silent
   find ~/nuclei-templates -type f -not -path '*/\.*' | grep .yaml > /tmp/nuclei.txt
