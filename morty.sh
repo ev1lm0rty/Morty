@@ -77,7 +77,7 @@ dal_fox(){
     echo "XSS SCAN ( $1 )"
     echo "#------------------------------------#"
     #dalfox file urls.txt -o $(pwd)/dalfox.txt -w 1000
-    cat urls.txt | /opt/kxss | gf files | dalfox pipe -w 1000 -o $(pwd)/dalfox.txt
+    cat urls.txt paramspider.txt | sort | uniq | /opt/kxss | awk '{print $NF}' | gf files | sed 's/=.*/=/' | dalfox pipe -w 1000 -o $(pwd)/dalfox.txt
     touch DALFOX
 }
 
@@ -112,7 +112,8 @@ port_scan(){
     echo "#------------------------------------#"
     #sudo $naabu -iL ip.txt -p - -nC -o portscan.txt -nmap
     sudo masscan -iL ip.txt -p 1-65535 -oL portscan.txt --rate=1000 -Pn 2>/dev/null
-
+    cat portscan.txt  | awk '{print $3}' | sort | uniq | tr '\n' ',' | sed 's/.$//' > open_ports.txt
+    sudo nmap -sCV -oN nmap_connect_scan.txt -Pn -p $(cat open_ports.txt) -iL ip.txt
 }
 
 s3_scan(){
@@ -120,7 +121,6 @@ s3_scan(){
     echo "S3 SCAN ( $1 )"
     echo "#------------------------------------#"
     python3 /opt/S3Scanner/s3scanner.py -l subdomains.txt -o buckets.txt 2>/dev/null
-
     touch S3
 }
 
