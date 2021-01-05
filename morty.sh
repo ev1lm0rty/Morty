@@ -5,7 +5,7 @@ date=$(date +%d_%b_%Y)
 resolvers=/opt/resolvers.txt
 templatefile=/opt/nuclei.txt
 eye=/opt/EyeWitness/Python/EyeWitness.py
-wordlist=opt/SecLists-master/Discovery/DNS/dns-Jhaddix.txt
+wordlist=/opt/SecLists-master/Discovery/DNS/dns-Jhaddix.txt
 fuzzword=/opt/SecLists-master/Discovery/Web-Content/raft-large-words.txt
 smallwordlist=/opt/SecLists-master/Discovery/DNS/deepmagic.com-prefixes-top500.txt
 #-----------------------------------------------#
@@ -34,7 +34,7 @@ subdomain_scan() {
     subfinder -silent -dL $1 -timeout 5 -t 100 -nW -nC -o subfinder.txt &
     shuffledns -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -w $wordlist -o shuffle.txt &
     wait
-    cat *brute.txt amass.txt subfinder.txt shuffle.txt brute_force_domain.txt 2>/dev/null | sort | uniq >> temp.txt
+    cat *brute.txt amass.txt subfinder.txt shuffle.txt brute_force_domain.txt 2>/dev/null | sort | uniq >> subdomains.txt
     rm -rf *brute.txt amass.txt subfinder.txt shuffle.txt
 
 }
