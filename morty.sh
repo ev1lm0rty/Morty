@@ -22,9 +22,25 @@ subdomain_scan() {
     shuffledns -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -w $wordlist -o shuffle.txt &
 
     wait
+    
+    echo "#------------------------------------#"
+    echo "RUNNING BRUTE SCAN"
+    echo "#------------------------------------#"
+    x=0
+    for i in $(cat $1)
+    do
+      shuffledns -massdns /opt/massdns -d $i -nC -silent -w $wordlist -r $resolvers -o $i_brute.txt &
+      if [[ $x -eq 10 ]]
+      then
+        wait
+      else
+        ((x=x+1))
+      fi
+    done
 
-    cat amass.txt subfinder.txt shuffle.txt 2>/dev/null | sort | uniq >> temp.txt
-    rm -rf amass.txt subfinder.txt shuffle.txt
+    wait
+    cat *brute.txt amass.txt subfinder.txt shuffle.txt 2>/dev/null | sort | uniq >> temp.txt
+    rm -rf *brute.txt amass.txt subfinder.txt shuffle.txt
 
 }
 
@@ -34,9 +50,12 @@ third_level() {
     echo "#------------------------------------#"
 
     shuffledns -massdns /opt/massdns -list temp.txt -nC -silent -w $smallwordlist -r $resolvers -o third_temp.txt  2>/dev/null
-    cat third_temp.txt temp.txt | sort | uniq > subdomains.txt
-    comm -23 <(sort subdomains.txt) <(sort out_of_scope.txt) > mm.txt
-    mv mm.txt subdomains.txt
+    cat third_temp.txt temp.txt | sort | uniq | tac > subdomains.txt
+    if [[ $# -eq 1 ]]
+    then
+      comm -23 <(sort subdomains.txt) <(sort $1 ) | tac > mm.txt
+      mv mm.txt subdomains.txt
+    fi
     rm -rf temp.txt third_temp.txt
 }
 
@@ -61,6 +80,7 @@ url_extract() {
     gau $i >> raw_urls.txt
     cat raw_urls.txt | sort | uniq | gf files > urls.txt
     cat urls.txt | httpx -no-color -silent -title -status-code -content-length -fc 404 -o httpx.txt  2>/dev/null
+    cat httpx.txt | awk '{print $1}'| sort | uniq > urls.txt
     touch URL
 
 }
@@ -141,7 +161,7 @@ screen_shot(){
     echo "#------------------------------------#" 
     #python3 $eye -d $1_EYE -f subdomains.txt --no-prompt --threads 100 --max-retries 0 2>/dev/null 
     mkdir AQUATONE
-    cat subdomains.txt | /opt/aquatone -out ./AQUATONE -silent -threads 100
+    cat subdomains.txt | /opt/aquatone -out ./AQUATONE -silent -threads 100 2>/dev/null
     touch SCREEN
 }
 
@@ -169,7 +189,14 @@ main(){
    if [[ ! -f subdomains.txt ]]
    then
     subdomain_scan $1
-    third_level
+
+    if [[ $# -eq 2  ]]
+    then
+      third_level $2
+    else
+      third_level
+    fi
+
    fi
 
    if [[ ! -f ip.txt ]]
@@ -253,9 +280,9 @@ main(){
     zip -r $1.zip Project_$1
 }
 
-if [[ $# -ne 1 ]]
+if [[ $# -lt 1 ]]
 then
-  echo "Usage ./morty.sh <targetfile>"
+  echo "Usage ./morty.sh <targetfile> <outofscopefile>"
 else
   if [[ ! -d "Project_$1" ]]
   then
@@ -264,7 +291,7 @@ else
 
   cd "Project_$1" 2> /dev/null
   cp ../$1 . 2> /dev/null
-  cp ../out_of_scope.txt . 2>/dev/null
+  cp ../$2 . 2>/dev/null
 
   nuclei -update-templates -silent
   find ~/nuclei-templates -type f -not -path '*/\.*' | grep .yaml > /tmp/nuclei.txt
@@ -274,5 +301,11 @@ else
   sudo mv /tmp/gf.txt /opt
 
   clear
-  main $1
+
+  if [[ $# -eq 1 ]]
+  then
+    main $1
+  else
+    main $1 $2
+  fi
 fi
