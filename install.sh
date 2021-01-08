@@ -18,6 +18,7 @@ base_i(){
     cp DotFiles/tmux.conf ~/.tmux.conf
     cp DotFiles/vimrc ~/.vimrc
     sudo mv DotFiles /opt
+    rm -rf DotFiles
     
 }
 
@@ -74,7 +75,7 @@ massdns_i(){
 
 param_i(){
 
-    if [[ $# -ne 0]]
+    if [[ $# -ne 0 ]]
     then
         sudo rm -rf /opt/ParamSpider
     fi
@@ -95,7 +96,7 @@ git_i(){
 
 fav_i(){
     
-    if [[ $# -ne 0]]
+    if [[ $# -ne 0 ]]
     then
         sudo rm -rf /opt/FavFreak
     fi
@@ -107,20 +108,20 @@ fav_i(){
 }
 
 secret_i(){
-    if [[ $# -ne 0]]
+    if [[ $# -ne 0 ]]
     then
         sudo rm -rf /opt/secretfinder
     fi
 
     git clone https://github.com/m4ll0k/SecretFinder.git secretfinder
     cd secretfinder
-    python -m pip install -r requirements.txt or pip install -r requirements.txt
+    python3 -m pip install -r requirements.txt or pip install -r requirements.txt
     cd /tmp
     sudo mv /tmp/secretfinder /opt
 }
 
 dirsearch_i(){
-    if [[ $# -ne 0]]
+    if [[ $# -ne 0 ]]
     then
         sudo rm -rf /opt/dirsearch
     fi
@@ -133,7 +134,7 @@ dirsearch_i(){
 
 gf_i(){
     go get -u github.com/tomnomnom/gf
-    echo 'source $GOPATH/src/github.com/tomnomnom/gf/gf-completion.bash' >> ~/.bashrc
+    #echo 'source $GOPATH/src/github.com/tomnomnom/gf/gf-completion.bash' >> ~/.bashrc
     go get -u github.com/tomnomnom/waybackurls
     mkdir ~/.gf
     cp -r $GOPATH/src/github.com/tomnomnom/gf/examples ~/.gf
@@ -162,7 +163,7 @@ gf_i(){
 }
 
 s3_i(){
-    if [[ $# -ne 0]]
+    if [[ $# -ne 0 ]]
     then
         sudo rm -rf /opt/S3Scanner
     fi
@@ -185,7 +186,7 @@ eye_i(){
 
 aqua_i(){
 
-    if [[ $# -ne 0]]
+    if [[ $# -ne 0 ]]
     then
        echo "Manually update aquatone"
     else
@@ -221,11 +222,12 @@ wordlist_i(){
         cd /opt
         sudo wget "https://github.com/danielmiessler/SecLists/archive/master.zip"
         sudo unzip master.zip
-        sudo rm -rf masater.zip
+        sudo rm -rf master.zip
 
     fi
     
     cd /opt
+    sudo rm -rf resolvers.txt
     sudo wget https://github.com/janmasarik/resolvers/raw/master/resolvers.txt
 
 }
@@ -233,7 +235,7 @@ wordlist_i(){
 tom_i(){
     cd /tmp
     git clone https://github.com/tomnomnom/hacks
-    cd hacks/kxss
+    cd ./hacks/kxss
     go build
     sudo mv kxss /opt
     cd /tmp 
