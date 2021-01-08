@@ -17,7 +17,7 @@ subdomain_brute(){
 
   for i in $(cat $1)
   do
-    shuffledns -massdns /opt/massdns -d $i -w $wordlist -r $resolvers -o ${i}_brute.txt
+    shuffledns -silent -massdns /opt/massdns -d $i -w $wordlist -r $resolvers -o ${i}_brute.txt
   done
 
   cat *brute.txt | sort | uniq > brute_force_domain.txt
@@ -30,11 +30,20 @@ subdomain_scan() {
     echo "RUNNING SUBDOMAIN SCAN"
     echo "#------------------------------------#"
 
-    #amass enum -active -df $1 -o amass.txt -timeout 1 -max-dns-queries 150 -noresolvrate 
+    amass enum -active -df $1 -o amass.txt -timeout 1 -max-dns-queries 150 -noresolvrate 
     subfinder -silent -dL $1 -timeout 5 -t 100 -nW -nC -o subfinder.txt &
-    shuffledns -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -w $wordlist -o shuffle.txt &
+    shuffledns -silent -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -w $wordlist -o shuffle.txt &
     wait
-    cat *brute.txt amass.txt subfinder.txt shuffle.txt brute_force_domain.txt 2>/dev/null | sort | uniq >> subdomains.txt
+    
+    test=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    wget https://chaos-data.projectdiscovery.io/$test.zip
+    
+    if [[ -f $test.zip ]]
+    then
+      unzip $test.zip && rm -rf $test.zip
+    fi
+
+    cat *brute.txt $test.txt amass.txt subfinder.txt shuffle.txt brute_force_domain.txt 2>/dev/null | sort | uniq >> subdomains.txt
     rm -rf *brute.txt amass.txt subfinder.txt shuffle.txt
 
 }
@@ -46,7 +55,7 @@ third_level() {
 
     for i in $(cat subdomains.txt)
     do
-      shuffledns -massdns /opt/massdns -d $i -r $resolvers -o $i_third.txt 
+      shuffledns -silent -massdns /opt/massdns -d $i -r $resolvers -o $i_third.txt -w $smallwordlist
     done
 
     cat *third.txt subdomains.txt | sort | uniq > temp.txt
@@ -84,7 +93,7 @@ url_extract() {
     cat httpx.txt | awk '{print $1}'| sort | uniq > urls.txt
     python3 /opt/ParamSpider/paramspider.py --level high -d $i -o $(pwd)/paramspider.txt  2>/dev/null >/dev/null
     cat paramspider.txt >> urls.txt
-    cat urls.txt | sed 's/=.*//' > temp_url.txt
+    cat urls.txt | sed 's/=.*/=/' > temp_url.txt
     mv temp_url.txt urls.txt
     touch URL
 }
@@ -93,7 +102,9 @@ dal_fox(){
     echo "#------------------------------------#"
     echo "XSS SCAN ( $1 )"
     echo "#------------------------------------#"
-    cat urls.txt  | sort | uniq | /opt/kxss | awk '{print $NF}' | gf files | sed 's/=.*/=/' | dalfox pipe -w 1000  -o $(pwd)/dalfox.txt
+    
+    cat urls.txt | gf files | /opt/kxss | awk '{print $NF}' | sed 's/=.*/=/' > kxss.txt
+    cat kxss.txt | dalfox pipe -w 1000  -o $(pwd)/dalfox.txt
     touch DALFOX
 }
 
@@ -101,7 +112,8 @@ template_scan(){
     echo "#------------------------------------#"
     echo "TEMPLATE SCAN ( $1 )"
     echo "#------------------------------------#"
-    nuclei -l urls.txt -silent -t ~/nuclei-templates -o template_scan.txt
+    
+    nuclei -l urls.txt -silent -c 200 -t ~/nuclei-templates -o template_scan.txt
     touch TEMPLATE
 }
 
@@ -109,6 +121,7 @@ favicon_scan(){
     echo "#------------------------------------#"
     echo "FAVICON SCAN ( $1 )"
     echo "#------------------------------------#"
+    
     cat urls.txt | python3 /opt/FavFreak/favfreak.py -o favfreak.txt 2>/dev/null >/dev/null
     touch FAV
 }
@@ -117,6 +130,7 @@ dirfuzz(){
     echo "#------------------------------------#"
     echo "DIR FUZZING ( $1 )"
     echo "#------------------------------------#"
+    
     /opt/gobuster dir -u $1 -w $fuzzword -o $1_gobuster.txt -q -t 100  2>/dev/null
     touch FUZZ
 }
@@ -127,7 +141,7 @@ port_scan(){
     echo "#------------------------------------#"
  
     sudo masscan -iL ip.txt -p 1-65535 -oL portscan.txt --rate=1000 -Pn 2>/dev/null
-    cat portscan.txt  | awk '{print $3}' | sort | uniq | tr '\n' ',' | sed 's/.$//' > open_ports.txt
+    cat portscan.txt  | awk '{print $3}' | sort -u | sed '/^$/d' | tr '\n' ',' | sed 's/,$//' > open_ports.txt
 }
 
 nmap_scan(){
@@ -135,7 +149,7 @@ nmap_scan(){
   echo "PORT SCAN "
   echo "#------------------------------------#"
 
-  sudo nmap -sCV -oN nmap_connect_scan.txt -Pn -p $(cat open_ports.txt) -iL ip.txt
+  sudo nmap -sCV --script=vuln -oN nmap_connect_scan.txt -Pn -p $(cat open_ports.txt) -iL ip.txt
 }
 
 s3_scan(){
@@ -188,7 +202,7 @@ main(){
    toilet -f pagga --metal "MORTY SCAN"
    echo "--------------------------------------"
    echo
-   echo "#~~~~~~~~( $1 )~~~~~~~~#"
+   echo "#~~~~~~~~( Project: $1 )~~~~~~~~#"
    echo
 
    if [[ ! -f subdomains.txt ]]
