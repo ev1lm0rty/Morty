@@ -30,13 +30,13 @@ subdomain_scan() {
     echo "RUNNING SUBDOMAIN SCAN"
     echo "#------------------------------------#"
 
-    amass enum -active -df $1 -o amass.txt -timeout 1 -max-dns-queries 150 -noresolvrate 
+    #amass enum -active -df $1 -o amass.txt -timeout 1 -max-dns-queries 150 -noresolvrate 
     subfinder -silent -dL $1 -timeout 5 -t 100 -nW -nC -o subfinder.txt &
     shuffledns -silent -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -w $wordlist -o shuffle.txt &
     wait
     
     test=$(echo "$1" | tr '[:upper:]' '[:lower:]')
-    wget https://chaos-data.projectdiscovery.io/$test.zip
+    wget https://chaos-data.projectdiscovery.io/$test.zip 2>/dev/null 
     
     if [[ -f $test.zip ]]
     then
@@ -44,7 +44,7 @@ subdomain_scan() {
     fi
 
     cat *brute.txt $test.txt amass.txt subfinder.txt shuffle.txt brute_force_domain.txt 2>/dev/null | sort | uniq >> subdomains.txt
-    rm -rf *brute.txt amass.txt subfinder.txt shuffle.txt
+    rm -rf *brute.txt test.txt amass.txt subfinder.txt shuffle.txt
 
 }
 
@@ -58,7 +58,7 @@ third_level() {
       shuffledns -silent -massdns /opt/massdns -d $i -r $resolvers -o $i_third.txt -w $smallwordlist
     done
 
-    cat *third.txt subdomains.txt | sort | uniq > temp.txt
+    cat *_third.txt subdomains.txt | sort | uniq > temp.txt
     mv temp.txt subdomains.txt
 
     if [[ $# -eq 1 ]]
@@ -178,8 +178,8 @@ screen_shot(){
     echo "SCREENSHOT ( $1 )" 
     echo "#------------------------------------#" 
     #python3 $eye -d $1_EYE -f subdomains.txt --no-prompt --threads 100 --max-retries 0 2>/dev/null 
-    mkdir AQUATONE
-    cat subdomains.txt | /opt/aquatone -out ./AQUATONE -silent -threads 100 2>/dev/null
+    mkdir SCREENSHOT
+    cat subdomains.txt | /opt/aquatone -out ./SCREENSHOT -silent -threads 100 2>/dev/null
     touch SCREEN
 }
 
@@ -196,6 +196,11 @@ cleanup(){
   rm -rf gecko*
   find . -empty > DELETED_EMPTYFILES.txt
   find . -empty -delete
+  mkdir PORT_SCAN SUBDOMAINS INFO
+  mv nmap_connect_scan.txt ip.txt open_ports.txt portscan.txt PORT_SCAN
+  mv $1 DELETED_EMPTY_FILES INFO
+  for i in $(cat subdomains.txt) ; do mv $i SUBDOMAINS/ ; done
+  mv subdomains.txt brute_force_domain.txt INFO
 }
 
 main(){
@@ -258,10 +263,10 @@ main(){
          template_scan $i & 
         fi
 
-        # if [[ ! -f FAV ]]
-        # then
-        #  favicon_scan $i & 
-        # fi
+        if [[ ! -f FAV ]]
+         then
+          favicon_scan $i & 
+        fi
 
         if [[ ! -f FUZZ ]]
         then
@@ -294,7 +299,7 @@ main(){
       nmap_scan
     fi
 
-    cleanup
+    cleanup $1
     echo "Finished on $date" >> COMPLETED
     cd ..
     zip -r $1.zip Project_$1 && rm -rf Project_$1 $1 $2
