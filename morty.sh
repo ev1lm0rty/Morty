@@ -17,12 +17,11 @@ subdomain_brute(){
 
   for i in $(cat $1)
   do
-    shuffledns -silent -massdns /opt/massdns -d $i -w $wordlist -r $resolvers -o ${i}_brute.txt
+    shuffledns -silent -massdns /opt/massdns -d $i -w $wordlist -r $resolvers -o ${i}.btemp
   done
 
-  cat *brute.txt | sort | uniq > brute_force_domain.txt
-  rm -rf *brute.txt
-  
+  cat *.btemp | sort -u > bf.stemp
+  rm -rf *.btemp
 }
 
 subdomain_scan() {
@@ -30,9 +29,11 @@ subdomain_scan() {
     echo "RUNNING SUBDOMAIN SCAN"
     echo "#------------------------------------#"
 
-    #amass enum -active -df $1 -o amass.txt -timeout 1 -max-dns-queries 150 -noresolvrate 
-    subfinder -silent -dL $1 -timeout 5 -t 100 -nW -nC -o subfinder.txt &
-    shuffledns -silent -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -w $wordlist -o shuffle.txt &
+    #amass enum -active -df $1 -o amass.txt -timeout 1 -max-dns-queries 150 -noresolvrate
+    curl -v -silent https://$1 --stderr - | awk '/^content-security-policy:/' | grep -Eo "[a-zA-Z0-9./?=_-]*" |  sed -e '/\./!d' -e '/[^A-Za-z0-9._-]/d' -e 's/^\.//' | sort -u > csp.stemp
+    curl -s "https://crt.sh/?q=%25.$1&output=json" | jq -r '.[].name_value' | sed 's/\*\.//g' | sort -u >> crt.stemp 
+    subfinder -silent -dL $1 -timeout 5 -t 100 -nW -nC -o subfinder.stemp &
+    shuffledns -silent -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -o shuffle.stemp &
     wait
     
     test=$(echo "$1" | tr '[:upper:]' '[:lower:]')
@@ -43,8 +44,8 @@ subdomain_scan() {
       unzip $test.zip && rm -rf $test.zip
     fi
 
-    cat *brute.txt $test.txt amass.txt subfinder.txt shuffle.txt brute_force_domain.txt 2>/dev/null | sort | uniq >> subdomains.txt
-    rm -rf *brute.txt test.txt amass.txt subfinder.txt shuffle.txt
+    cat *.stemp $test.txt 2> /dev/null | sort -u >> subdomains.txt
+    rm -rf *.stemp
 
 }
 
@@ -58,15 +59,17 @@ third_level() {
       shuffledns -silent -massdns /opt/massdns -d $i -r $resolvers -o $i_third.txt -w $smallwordlist
     done
 
-    cat *_third.txt subdomains.txt | sort | uniq > temp.txt
-    mv temp.txt subdomains.txt
-
+    cat *_third.txt subdomains.txt | sort -u > temp.tdtemp
+    rm -rf *_third.txt
+  
     if [[ $# -eq 1 ]]
     then
-      comm -23 <(sort subdomains.txt) <(sort $1 ) | tac > mm.txt
-      mv mm.txt subdomains.txt
+      comm -23 <(sort temp.tdtemp) <(sort $1 ) > mm.txt
+      mv mm.txt temp.tdtemp
     fi
-    rm -rf temp.txt third_temp.txt
+
+    tac temp.tdtemp | filter-resolved > subdomains.txt
+    
 }
 
 sub_to_ip() {
@@ -88,13 +91,11 @@ url_extract() {
 
     waybackurls -no-subs $i >> raw_urls.txt
     gau $i >> raw_urls.txt
-    cat raw_urls.txt | sort | uniq | gf files > urls.txt
-    cat urls.txt | httpx -no-color -silent -title -status-code -content-length -fc 404 -o httpx.txt  2>/dev/null
-    cat httpx.txt | awk '{print $1}'| sort | uniq > urls.txt
     python3 /opt/ParamSpider/paramspider.py --level high -d $i -o $(pwd)/paramspider.txt  2>/dev/null >/dev/null
-    cat paramspider.txt >> urls.txt
-    cat urls.txt | sed 's/=.*/=/' > temp_url.txt
-    mv temp_url.txt urls.txt
+    cat paramspider.txt >> raw_urls.txt && rm -rf paramspider.txt
+    cat raw_urls | sort -u | gf files | httpx -no-color -silent -title -status-code -fc 404 -content-length -o httpx.txt  2>/dev/null
+    cat httpx.txt | awk '{print $1}'| sort -u > alive_urls.txt
+    cat alive_urls.txt | qsreplace -a > urls.txt
     touch URL
 }
 
@@ -103,7 +104,7 @@ dal_fox(){
     echo "XSS SCAN ( $1 )"
     echo "#------------------------------------#"
     
-    cat urls.txt | gf files | /opt/kxss | awk '{print $NF}' | sed 's/=.*/=/' > kxss.txt
+    cat urls.txt | /opt/kxss | awk '{print $NF}' | sed 's/=.*/=/' > kxss.txt
     cat kxss.txt | dalfox pipe -w 1000  -o $(pwd)/dalfox.txt
     touch DALFOX
 }
@@ -113,7 +114,7 @@ template_scan(){
     echo "TEMPLATE SCAN ( $1 )"
     echo "#------------------------------------#"
     
-    nuclei -l urls.txt -silent -c 200 -t ~/nuclei-templates -o template_scan.txt
+    nuclei -l urls.txt -silent -c 900 -t ~/nuclei-templates -o template_scan.txt
     touch TEMPLATE
 }
 
@@ -146,10 +147,11 @@ port_scan(){
 
 nmap_scan(){
   echo "#------------------------------------#"
-  echo "PORT SCAN "
+  echo "NMAP SCAN "
   echo "#------------------------------------#"
 
-  sudo nmap -sCV --script=vuln -oN nmap_connect_scan.txt -Pn -p $(cat open_ports.txt) -iL ip.txt
+  mkdir nmap
+  sudo nmap -sCV --script=vuln -oA nmap/nmap_connect_scan.txt -Pn -p $(cat open_ports.txt) -iL ip.txt
 }
 
 s3_scan(){
@@ -165,6 +167,7 @@ pattern_search(){
     echo "#------------------------------------#"
     echo "PATTERN SEARCH ( $1 )" 
     echo "#------------------------------------#" 
+
     mkdir pattern
     for i in $(cat /opt/gf.txt)
     do
@@ -177,6 +180,7 @@ screen_shot(){
     echo "#------------------------------------#"
     echo "SCREENSHOT ( $1 )" 
     echo "#------------------------------------#" 
+
     #python3 $eye -d $1_EYE -f subdomains.txt --no-prompt --threads 100 --max-retries 0 2>/dev/null 
     mkdir SCREENSHOT
     cat subdomains.txt | /opt/aquatone -out ./SCREENSHOT -silent -threads 100 2>/dev/null
@@ -187,20 +191,36 @@ secret_find(){
     echo "#------------------------------------#"
     echo "SECRETFINDER ( $1 )" 
     echo "#------------------------------------#" 
-    cat *.txt | grep .js > js.txt
-    python3 /opt/secretfinder/SecretFinder.py -i js.txt -o secretfinder.html 2>/dev/null 
+    cat raw_urls.txt | grep .js | sort -u > sf.txt
+    python3 /opt/secretfinder/SecretFinder.py -i sf.txt -o secretfinder.html 2>/dev/null 
     touch SECRET
 }
 
+cors_misconfig(){
+  # wont use, too slow
+  cat urls.txt | while read url;do target=$(curl -s -I -H "Origin: https://evil.com" -X GET $url) | if grep 'https://evil.com'; then echo "[Potentional CORS Found] $url" | tee -a cors.txt; fi;done
+}
+
+takeover(){
+  echo "#------------------------------------#"
+  echo "SUBDOMAIN TAKEOVER ( $1 )" 
+  echo "#------------------------------------#" 
+  
+  #subjack -w subdomains.txt -t 500 -o subdomain_takeover.txt -ssl -a
+  subzy -targets subdomains.txt | tee subdomain_takeover.txt
+}
+
 cleanup(){
-  rm -rf gecko*
-  find . -empty > DELETED_EMPTYFILES.txt
+  echo "#------------------------------------#"
+  echo "CLEANUP" 
+  echo "#------------------------------------#" 
+
   find . -empty -delete
   mkdir PORT_SCAN SUBDOMAINS INFO
-  mv nmap_connect_scan.txt ip.txt open_ports.txt portscan.txt PORT_SCAN
-  mv $1 DELETED_EMPTY_FILES INFO
+  mv nmap ip.txt open_ports.txt portscan.txt PORT_SCAN
+  mv $1 INFO
   for i in $(cat subdomains.txt) ; do mv $i SUBDOMAINS/ ; done
-  mv subdomains.txt brute_force_domain.txt INFO
+  mv subdomains.txt INFO
 }
 
 main(){
@@ -212,7 +232,7 @@ main(){
 
    if [[ ! -f subdomains.txt ]]
    then
-    subdomain_brute $1
+    #subdomain_brute $1
     subdomain_scan $1
 
     if [[ $# -eq 2  ]]
@@ -221,6 +241,11 @@ main(){
     else
       third_level
     fi
+   fi
+
+   if [[ ! -f subdomain_takeover.txt ]]
+   then
+     takeover
    fi
 
    if [[ ! -f ip.txt ]]

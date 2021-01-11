@@ -4,6 +4,7 @@
 # https://github.com/dwisiswant0/go-dork
 # https://github.com/hahwul/WebHackersWeapons
 # https://github.com/internetwache/CT_subdomains
+# https://github.com/dwisiswant0/awesome-oneliner-bugbounty
 # https://github.com/sehno/Bug-bounty/blob/master/bugbounty_checklist.md
 #------------------------------#
 
@@ -11,12 +12,13 @@ base_i(){
     sudo apt update && sudo apt full-upgrade -y
     sudo apt install git vim nano tmux rlwrap \
     jq python3 python3-pip net-tools \
-    nmap gawk curl wget fping toilet whatweb masscan chromium-browser gcc make libpcap-dev -y
+    nmap gawk curl wget fping toilet whatweb masscan chromium-browser gcc make libpcap-dev jq -y
     python3 -m pip install --user virtualenv
 
     git clone https://github.com/mrjoker05/DotFiles
     cp DotFiles/tmux.conf ~/.tmux.conf
     cp DotFiles/vimrc ~/.vimrc
+    cp DotFiles/bashrc ~/.bashrc
     sudo mv DotFiles /opt
     rm -rf DotFiles
     
@@ -37,15 +39,20 @@ go_i(){
 }
 
 gotools_i(){
-    GO111MODULE=on go get -u -v github.com/projectdiscovery/naabu/v2/cmd/naabu
-    go get github.com/tomnomnom/waybackurls
-    GO111MODULE=on go get -u -v github.com/lc/gau
-    go get -u github.com/hahwul/dalfox
-    go get -u github.com/ffuf/ffuf
-    GO111MODULE=on go get -u -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei
-    GO111MODULE=on go get -u -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder
-    GO111MODULE=on go get -u -v github.com/projectdiscovery/shuffledns/cmd/shuffledns
-    GO111MODULE=on go get -u -v github.com/projectdiscovery/httpx/cmd/httpx
+    GO111MODULE=on go get -u github.com/projectdiscovery/naabu/v2/cmd/naabu
+    GO111MODULE=on go get -u github.com/lc/gau
+    GO111MODULE=on go get -u github.com/ffuf/ffuf
+    GO111MODULE=on go get -u github.com/hahwul/dalfox
+    GO111MODULE=on go get -u github.com/projectdiscovery/nuclei/v2/cmd/nuclei
+    GO111MODULE=on go get -u github.com/projectdiscovery/subfinder/v2/cmd/subfinder
+    GO111MODULE=on go get -u github.com/projectdiscovery/shuffledns/cmd/shuffledns
+    GO111MODULE=on go get -u github.com/projectdiscovery/httpx/cmd/httpx
+    GO111MODULE=on go get -u github.com/tomnomnom/qsreplace
+    GO111MODULE=on go get -u github.com/tomnomnom/waybackurls
+    GO111MODULE=on go get -u github.com/tomnomnom/hacks/filter-resolved
+    GO111MODULE=on go get -u github.com/haccer/subjack
+    GO111MODULE=on go get -u -v github.com/lukasikic/subzy
+    GO111MODULE=on go install -v github.com/lukasikic/subzy
 }
 
 masscan_i(){
@@ -57,10 +64,6 @@ masscan_i(){
 }
 
 amass_i(){
-    # cd /tmp
-    # wget "https://github.com/OWASP/Amass/releases/download/v3.10.5/amass_linux_amd64.zip"
-    # unzip amass*
-    # sudo mv amass* /opt/amass
     export GO111MODULE=on
     go get -v -u github.com/OWASP/Amass/v3/...
 }
@@ -257,8 +260,7 @@ then
     wordlist_i
     tom_i
     #git_i
-    #eye_i
-    
+    #eye_i 
     aqua_i 1
     s3_i 1
     #dirsearch_i 1
@@ -279,7 +281,6 @@ else
     tom_i
     #git_i
     #eye_i
-
     aqua_i 
     s3_i 
     #dirsearch_i 
