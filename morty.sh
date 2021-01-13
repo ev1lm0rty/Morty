@@ -361,11 +361,39 @@ else
   sudo mv /tmp/gf.txt /opt
   clear
 
+  # Export functions
+  export -f 
+  subdomain_brute \
+  subdomain_scan \
+  third_level \
+  clean_domain \
+  sub_to_ip \
+  url_extract \
+  dal_fox \
+  template_scan \
+  favicon_scan \
+  dirfuzz \
+  port_scan \
+  nmap_scan \
+  s3_scan \
+  pattern_search \
+  screen_shot \
+  secret_find \
+  cors_misconfig \
+  takeover \
+  cleanup \
+  main
+
+  # tmux session
+  tmux new -s test -d
+  tmux rename-window -t test w
+  
+
   if [[ $# -eq 1 ]]
   then
-    main $1
+    tmux send-keys -t new:w "main $1" Enter
   else
-    main $1 $2
+    tmux send-keys -t new:w "main $1 $2" Enter
   fi
 
 fi
