@@ -24,14 +24,18 @@ subdomain_brute(){
   rm -rf *.btemp
 }
 
-subdomain_scan() {
+subdomain_scan(){
     echo "#------------------------------------#"
     echo "RUNNING SUBDOMAIN SCAN"
     echo "#------------------------------------#"
 
     #amass enum -active -df $1 -o amass.txt -timeout 1 -max-dns-queries 150 -noresolvrate
     #curl -v -silent https://$1 --stderr - | awk '/^content-security-policy:/' | grep -Eo "[a-zA-Z0-9./?=_-]*" |  sed -e '/\./!d' -e '/[^A-Za-z0-9._-]/d' -e 's/^\.//' | sort -u > csp.stemp
-    #curl -s "https://crt.sh/?q=%25.$1&output=json" | jq -r '.[].name_value' | sed 's/\*\.//g' | sort -u >> crt.stemp 
+    for i in $(cat $1)
+    do
+      curl -s "https://crt.sh/?q=$i&output=json" | jq -r '.[].name_value' | sed 's/\*\.//g' | sort -u >> crt.stemp
+    done
+    
     subfinder -silent -dL $1 -timeout 5 -t 100 -nW -nC -o subfinder.stemp &
     shuffledns -silent -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -o shuffle.stemp &
     wait
@@ -50,33 +54,36 @@ subdomain_scan() {
 
 }
 
-third_level() {
+third_level(){
     echo "#------------------------------------#"
     echo "RUNNING THIRD LEVEL SUBDOMAIN SCAN"
     echo "#------------------------------------#"
 
-    #for i in $(cat subdomains.txt)
-    #do
-    #  shuffledns -silent -massdns /opt/massdns -d $i -r $resolvers -o $i_third.txt -w $smallwordlist
-    #done
-
-    #cat *_third.txt subdomains.txt | sort -u > temp.tdtemp
-    #rm -rf *_third.txt
+    for i in $(cat subdomains.txt)
+    do
+     shuffledns -silent -massdns /opt/massdns -d $i -r $resolvers -o $i_third.txt -w $smallwordlist
+    done
   
-    if [[ $# -eq 1 ]]
+}
+
+clean_domain(){
+   
+    cat *_third.txt subdomains.txt | sort -u > temp.tdtemp
+    rm -rf *_third.txt
+
+   if [[ $# -eq 1 ]]
     then
       comm -23 <(sort temp.tdtemp) <(sort $1 ) > mm.txt
       mv mm.txt temp.tdtemp
     fi
 
-    #tac temp.tdtemp | filter-resolved > subdomains.txt
-    sed -i '/ /d' subdomains.txt
+    tac temp.tdtemp | filter-resolved > subdomains.txt
     mv subdomains.txt original.txt
     cat original.txt | filter-resolved > subdomains.txt
-    
+
 }
 
-sub_to_ip() {
+sub_to_ip(){
     echo "#------------------------------------#"
     echo "SUBDOMAIN TO IP"
     echo "#------------------------------------#"
@@ -88,7 +95,7 @@ sub_to_ip() {
     cat tempip.txt | sort | uniq > ip.txt && rm -rf tempip.txt
 }
 
-url_extract() {
+url_extract(){
     echo "#------------------------------------#"
     echo "URL EXTRACTION ( $1 )"
     echo "#------------------------------------#"
@@ -155,7 +162,8 @@ nmap_scan(){
   echo "#------------------------------------#"
 
   mkdir nmap
-  sudo nmap -sCV --script=vuln -oA nmap/nmap_connect_scan.txt -Pn -p $(cat open_ports.txt) -iL ip.txt
+  sudo nmap --script=vuln -oA nmap/vuln_scan -Pn -p $(cat open_ports.txt) -iL ip.txt
+  sudo nmap -sCV -oA nmap/connect_scan -Pn -p $(cat open_ports.txt) -iL ip.txt
 }
 
 s3_scan(){
@@ -221,7 +229,7 @@ cleanup(){
 
   find . -empty -delete
   mkdir PORT_SCAN SUBDOMAINS INFO
-  mv nmap ip.txt open_ports.txt portscan.txt PORT_SCAN
+  mv nmap ip.txt open_ports.txt portscan.txt original.txt subdomain_takeover.txt PORT_SCAN
   mv $1 INFO
   for i in $(cat subdomains.txt) ; do mv $i SUBDOMAINS/ ; done
   mv subdomains.txt INFO
@@ -238,12 +246,13 @@ main(){
    then
     subdomain_brute $1
     subdomain_scan $1
+    third_level
 
     if [[ $# -eq 2  ]]
     then
-      third_level $2
+      clean_domain $2
     else
-      third_level
+      clean_domain
     fi
    fi
 
@@ -348,8 +357,6 @@ else
   cp ../$1 . 2> /dev/null
   cp ../$2 . 2>/dev/null
   nuclei -update-templates -silent
-  find ~/nuclei-templates -type f -not -path '*/\.*' | grep .yaml > /tmp/nuclei.txt
-  sudo cp /tmp/nuclei.txt /opt
   gf -list > /tmp/gf.txt
   sudo mv /tmp/gf.txt /opt
   clear
