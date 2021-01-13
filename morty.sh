@@ -30,21 +30,22 @@ subdomain_scan() {
     echo "#------------------------------------#"
 
     #amass enum -active -df $1 -o amass.txt -timeout 1 -max-dns-queries 150 -noresolvrate
-    curl -v -silent https://$1 --stderr - | awk '/^content-security-policy:/' | grep -Eo "[a-zA-Z0-9./?=_-]*" |  sed -e '/\./!d' -e '/[^A-Za-z0-9._-]/d' -e 's/^\.//' | sort -u > csp.stemp
-    curl -s "https://crt.sh/?q=%25.$1&output=json" | jq -r '.[].name_value' | sed 's/\*\.//g' | sort -u >> crt.stemp 
+    #curl -v -silent https://$1 --stderr - | awk '/^content-security-policy:/' | grep -Eo "[a-zA-Z0-9./?=_-]*" |  sed -e '/\./!d' -e '/[^A-Za-z0-9._-]/d' -e 's/^\.//' | sort -u > csp.stemp
+    #curl -s "https://crt.sh/?q=%25.$1&output=json" | jq -r '.[].name_value' | sed 's/\*\.//g' | sort -u >> crt.stemp 
     subfinder -silent -dL $1 -timeout 5 -t 100 -nW -nC -o subfinder.stemp &
     shuffledns -silent -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -o shuffle.stemp &
     wait
     
-    test=$(echo "$1" | tr '[:upper:]' '[:lower:]')
-    wget https://chaos-data.projectdiscovery.io/$test.zip 2>/dev/null 
+    #test=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    #wget https://chaos-data.projectdiscovery.io/$test.zip 2>/dev/null 
     
-    if [[ -f $test.zip ]]
-    then
-      unzip $test.zip && rm -rf $test.zip
-    fi
+    #if [[ -f $test.zip ]]
+    #then
+      #unzip $test.zip && rm -rf $test.zip
+    #fi
 
     cat *.stemp $test.txt 2> /dev/null | sort -u >> subdomains.txt
+    sed -i '/ /d' subdomains.txt
     rm -rf *.stemp
 
 }
@@ -54,13 +55,13 @@ third_level() {
     echo "RUNNING THIRD LEVEL SUBDOMAIN SCAN"
     echo "#------------------------------------#"
 
-    for i in $(cat subdomains.txt)
-    do
-      shuffledns -silent -massdns /opt/massdns -d $i -r $resolvers -o $i_third.txt -w $smallwordlist
-    done
+    #for i in $(cat subdomains.txt)
+    #do
+    #  shuffledns -silent -massdns /opt/massdns -d $i -r $resolvers -o $i_third.txt -w $smallwordlist
+    #done
 
-    cat *_third.txt subdomains.txt | sort -u > temp.tdtemp
-    rm -rf *_third.txt
+    #cat *_third.txt subdomains.txt | sort -u > temp.tdtemp
+    #rm -rf *_third.txt
   
     if [[ $# -eq 1 ]]
     then
@@ -68,7 +69,10 @@ third_level() {
       mv mm.txt temp.tdtemp
     fi
 
-    tac temp.tdtemp | filter-resolved > subdomains.txt
+    #tac temp.tdtemp | filter-resolved > subdomains.txt
+    sed -i '/ /d' subdomains.txt
+    mv subdomains.txt original.txt
+    cat original.txt | filter-resolved > subdomains.txt
     
 }
 
@@ -232,7 +236,7 @@ main(){
 
    if [[ ! -f subdomains.txt ]]
    then
-    #subdomain_brute $1
+    subdomain_brute $1
     subdomain_scan $1
 
     if [[ $# -eq 2  ]]
