@@ -143,7 +143,7 @@ dirfuzz(){
     echo "DIR FUZZING ( $1 )"
     echo "#------------------------------------#"
     
-    /opt/gobuster dir -u $1 -w $fuzzword -o $1_gobuster.txt -q -t 100  2>/dev/null
+    /opt/gobuster dir -u $1 -w $fuzzword -o $1_gobuster.txt -q -t 50  2>/dev/null
     touch FUZZ
 }
 
@@ -162,7 +162,7 @@ nmap_scan(){
   echo "#------------------------------------#"
 
   mkdir nmap
-  sudo nmap --script=vuln -oA nmap/vuln_scan -Pn -p $(cat open_ports.txt) -iL ip.txt
+  #sudo nmap --script=vuln -oA nmap/vuln_scan -Pn -p $(cat open_ports.txt) -iL ip.txt
   sudo nmap -sCV -oA nmap/connect_scan -Pn -p $(cat open_ports.txt) -iL ip.txt
 }
 
@@ -229,7 +229,8 @@ cleanup(){
 
   find . -empty -delete
   mkdir PORT_SCAN SUBDOMAINS INFO
-  mv nmap ip.txt open_ports.txt portscan.txt original.txt subdomain_takeover.txt PORT_SCAN
+  mv nmap ip.txt open_ports.txt portscan.txt original.txt PORT_SCAN
+  mv subdomain_takeover.txt SUBDOMAINS
   mv $1 INFO
   for i in $(cat subdomains.txt) ; do mv $i SUBDOMAINS/ ; done
   mv subdomains.txt INFO
