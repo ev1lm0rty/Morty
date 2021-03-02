@@ -2,12 +2,14 @@
 
 #-----------------------------------------------#
 date=$(date +%d_%b_%Y)
-resolvers=/opt/resolvers.txt
-templatefile=/opt/nuclei.txt
-eye=/opt/EyeWitness/Python/EyeWitness.py
-wordlist=/opt/SecLists-master/Discovery/DNS/dns-Jhaddix.txt
-fuzzword=/opt/SecLists-master/Discovery/Web-Content/raft-large-words.txt
-smallwordlist=/opt/SecLists-master/Discovery/DNS/deepmagic.com-prefixes-top500.txt
+dns1=Tools/SecLists-master/Discovery/DNS/dns-Jhaddix.txt
+dns2=Tools/SecLists-master/Discovery/DNS/deepmagic.com-prefixes-top500.txt
+w1=Tools/SecLists-master/Discovery/Web-Content/raft-large-files.txt
+w2=Tools/SecLists-master/Discovery/Web-Content/raft-large-words.txt
+res1=Tools/resolvers.txt
+templates=Tools/nuclei-templates
+s3scanner=Tools/S3Scanner/s3scanner.py
+gf=Tools/patterns.txt
 #-----------------------------------------------#
 
 subdomain_brute(){
@@ -17,7 +19,7 @@ subdomain_brute(){
 
   for i in $(cat $1)
   do
-    shuffledns -silent -massdns /opt/massdns -d $i -w $wordlist -r $resolvers -o ${i}.btemp
+    shuffledns -silent -massdns /opt/massdns -d $i -w ../$dns1 -r ../$res1 -o ${i}.btemp
   done
 
   cat *.btemp | sort -u > bf.stemp
@@ -29,29 +31,11 @@ subdomain_scan(){
     echo "RUNNING SUBDOMAIN SCAN"
     echo "#------------------------------------#"
 
-    #amass enum -active -df $1 -o amass.txt -timeout 1 -max-dns-queries 150 -noresolvrate
-    #curl -v -silent https://$1 --stderr - | awk '/^content-security-policy:/' | grep -Eo "[a-zA-Z0-9./?=_-]*" |  sed -e '/\./!d' -e '/[^A-Za-z0-9._-]/d' -e 's/^\.//' | sort -u > csp.stemp
-    for i in $(cat $1)
-    do
-      curl -s "https://crt.sh/?q=$i&output=json" | jq -r '.[].name_value' | sed 's/\*\.//g' | sort -u >> crt.stemp
-    done
-    
     subfinder -silent -dL $1 -timeout 5 -t 100 -nW -nC -o subfinder.stemp &
-    shuffledns -silent -massdns /opt/massdns -list $1 -nC -r $resolvers -silent -o shuffle.stemp &
+    shuffledns -silent -massdns /opt/massdns -list $1 -nC -r $res1 -silent -o shuffle.stemp &
     wait
-    
-    #test=$(echo "$1" | tr '[:upper:]' '[:lower:]')
-    #wget https://chaos-data.projectdiscovery.io/$test.zip 2>/dev/null 
-    
-    #if [[ -f $test.zip ]]
-    #then
-      #unzip $test.zip && rm -rf $test.zip
-    #fi
-
-    cat *.stemp $test.txt 2> /dev/null | sort -u >> subdomains.txt
-    sed -i '/ /d' subdomains.txt
+    cat *.stemp | sort -u | sed '/ /d'>> subdomains.txt
     rm -rf *.stemp
-
 }
 
 third_level(){
@@ -61,26 +45,24 @@ third_level(){
 
     for i in $(cat subdomains.txt)
     do
-     shuffledns -silent -massdns /opt/massdns -d $i -r $resolvers -o $i_third.txt -w $smallwordlist
+     shuffledns -silent -massdns /opt/massdns -d $i -r $res1 -o $i.third -w $dns2
     done
   
 }
 
 clean_domain(){
-   
-    cat *_third.txt subdomains.txt | sort -u > temp.tdtemp
-    rm -rf *_third.txt
+    echo "#------------------------------------#"
+    echo "CLEANING DOMAIN LIST"
+    echo "#------------------------------------#"
 
-   if [[ $# -eq 1 ]]
+    cat *.third subdomains.txt | sort -u > temp.tdtemp
+    rm -rf *.third
+    if [[ $# -eq 1 ]]
     then
-      comm -23 <(sort temp.tdtemp) <(sort $1 ) > mm.txt
-      mv mm.txt temp.tdtemp
+      comm -23 <(sort temp.tdtemp) <(sort $1 ) > temp.txt
+      mv temp.txt temp.tdtemp
     fi
-
-    tac temp.tdtemp | filter-resolved > subdomains.txt
-    mv subdomains.txt original.txt
-    cat original.txt | filter-resolved > subdomains.txt
-
+    cat temp.tdtemp | sort -u | filter-resolved > subdomains.txt
 }
 
 sub_to_ip(){
@@ -92,7 +74,7 @@ sub_to_ip(){
     do
         dig +short $domain |grep -E "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" >> tempip.txt
     done
-    cat tempip.txt | sort | uniq > ip.txt && rm -rf tempip.txt
+    cat tempip.txt | sort -u > ip.txt && rm -rf tempip.txt
 }
 
 url_extract(){
@@ -102,10 +84,7 @@ url_extract(){
 
     waybackurls -no-subs $i >> raw_urls.txt
     gau $i >> raw_urls.txt
-    python3 /opt/ParamSpider/paramspider.py --level high -d $i -o $(pwd)/paramspider.txt  2>/dev/null >/dev/null
-    cat paramspider.txt >> raw_urls.txt && rm -rf paramspider.txt
-    cat raw_urls | qsreplace -a | gf files | httpx -silent -fc 404 -o httpx.txt
-    #cat raw_urls | sort -u | gf files | httpx -no-color -silent -title -status-code -fc 404 -content-length -o httpx.txt  2>/dev/null
+    cat raw_urls | sort -u | qsreplace -a | gf files | httpx -silent -status-code -title -fc 404 -o httpx.txt
     cat httpx.txt | awk '{print $1}'| sort -u > urls.txt
     touch URL
 }
@@ -114,9 +93,8 @@ dal_fox(){
     echo "#------------------------------------#"
     echo "XSS SCAN ( $1 )"
     echo "#------------------------------------#"
-    
-    #cat urls.txt | /opt/kxss | awk '{print $NF}' | sed 's/=.*/=/' > kxss.txt
-    #cat kxss.txt | dalfox pipe -w 1000  -o $(pwd)/dalfox.txt
+  
+    cat urls.txt | /opt/kxss | awk '{print $NF}' | sed 's/=.*/=/' > kxss.txt
     cat urls.txt | gf xss | dalfox pipe -w 1000 -o ./dalfox.txt 
     touch DALFOX
 }
@@ -126,7 +104,7 @@ template_scan(){
     echo "TEMPLATE SCAN ( $1 )"
     echo "#------------------------------------#"
     
-    nuclei -l urls.txt -silent -c 900 -t ~/nuclei-templates -o template_scan.txt
+    nuclei -l urls.txt -silent -c 900 -t $templates -o template_scan.txt
     touch TEMPLATE
 }
 
@@ -135,7 +113,7 @@ favicon_scan(){
     echo "FAVICON SCAN ( $1 )"
     echo "#------------------------------------#"
     
-    cat urls.txt | python3 /opt/FavFreak/favfreak.py -o favfreak.txt 2>/dev/null >/dev/null
+    cat urls.txt | python3 /opt/FavFreak/favfreak.py -o favfreak.txt
     touch FAV
 }
 
@@ -143,9 +121,8 @@ dirfuzz(){
     echo "#------------------------------------#"
     echo "DIR FUZZING ( $1 )"
     echo "#------------------------------------#"
-    
-    #/opt/gobuster dir -u $1 -w $fuzzword -o $1_gobuster.txt -q -t 50  2>/dev/null
-    ffuf -u $1/FUZZ -w $fuzzword -t 100 -ac -ic -sa -se -sf -o $1_ffuf.txt -s
+
+    ffuf -u $1/FUZZ -w $fuzzword -t 100 -ac -ic -sa -se -sf -o $1_ffuf.txt 
     touch FUZZ
 }
 
@@ -154,7 +131,7 @@ port_scan(){
     echo "PORT SCAN "
     echo "#------------------------------------#"
  
-    sudo masscan -iL ip.txt -p 1-65535 -oL portscan.txt --rate=1000 -Pn 2>/dev/null
+    sudo masscan -iL ip.txt -p 1-65535 -oL portscan.txt --rate=1000 -Pn
     cat portscan.txt  | awk '{print $3}' | sort -u | sed '/^$/d' | tr '\n' ',' | sed 's/,$//' > open_ports.txt
 }
 
@@ -172,7 +149,7 @@ s3_scan(){
     echo "S3 SCAN ( $1 )"
     echo "#------------------------------------#"
 
-    python3 /opt/S3Scanner/s3scanner.py -l subdomains.txt -o buckets.txt 
+    python3 ../$s3scanner -l subdomains.txt -o buckets.txt 
     touch S3
 }
 
@@ -182,9 +159,9 @@ pattern_search(){
     echo "#------------------------------------#" 
 
     mkdir pattern
-    for i in $(cat /opt/gf.txt)
+    for i in $(cat $gf)
     do
-      cat urls.txt  2>/dev/null | gf $i > pattern/${i}.txt
+      cat urls.txt  | gf $i > pattern/${i}.txt
     done
     touch PATTERN
 }
@@ -204,14 +181,13 @@ secret_find(){
     echo "#------------------------------------#"
     echo "SECRETFINDER ( $1 )" 
     echo "#------------------------------------#" 
-    cat raw_urls.txt | grep -E ".*\.js$" | sort -u > sf.txt
-    python3 /opt/secretfinder/SecretFinder.py -i sf.txt -o secretfinder.html 
+    # cat raw_urls.txt | grep -E ".*\.js$" | sort -u > sf.txt
+    mkdir sf
+    for url in $(cat urls.txt)
+    do
+      python3 /opt/secretfinder/SecretFinder.py -i $url -o sf/$url.secretfinder.html 
+    done
     touch SECRET
-}
-
-cors_misconfig(){
-  # wont use, too slow
-  cat urls.txt | while read url;do target=$(curl -s -I -H "Origin: https://evil.com" -X GET $url) | if grep 'https://evil.com'; then echo "[Potentional CORS Found] $url" | tee -a cors.txt; fi;done
 }
 
 takeover(){
@@ -220,7 +196,7 @@ takeover(){
   echo "#------------------------------------#" 
   
   subjack -w subdomains.txt -t 500 -o subdomain_takeover.txt -ssl -a
-  subzy -https -targets subdomains.txt | tee subdomain_takeover.txt
+  subzy -https -targets subdomains.txt >> subdomain_takeover.txt
 }
 
 cleanup(){
@@ -230,7 +206,7 @@ cleanup(){
 
   find . -empty -delete
   mkdir PORT_SCAN SUBDOMAINS INFO
-  mv nmap ip.txt open_ports.txt portscan.txt original.txt PORT_SCAN
+  mv nmap ip.txt open_ports.txt portscan.txt PORT_SCAN
   mv subdomain_takeover.txt SUBDOMAINS
   mv $1 INFO
   for i in $(cat subdomains.txt) ; do mv $i SUBDOMAINS/ ; done
@@ -260,7 +236,7 @@ main(){
 
    if [[ ! -f subdomain_takeover.txt ]]
    then
-     takeover
+     takeover &
    fi
 
    if [[ ! -f ip.txt ]]
@@ -361,6 +337,9 @@ else
   nuclei -update-templates -silent
   gf -list > /tmp/gf.txt
   sudo mv /tmp/gf.txt /opt
+  rm -rf ../Tools/resolvers.txt
+  wget https://github.com/janmasarik/resolvers/raw/master/resolvers.txt
+  mv resolvers.txt ../Tools
   clear
 
   if [[ $# -eq 1 ]]
