@@ -104,9 +104,9 @@ url_extract(){
     gau $i >> raw_urls.txt
     python3 /opt/ParamSpider/paramspider.py --level high -d $i -o $(pwd)/paramspider.txt  2>/dev/null >/dev/null
     cat paramspider.txt >> raw_urls.txt && rm -rf paramspider.txt
-    cat raw_urls | sort -u | gf files | httpx -no-color -silent -title -status-code -fc 404 -content-length -o httpx.txt  2>/dev/null
-    cat httpx.txt | awk '{print $1}'| sort -u > alive_urls.txt
-    cat alive_urls.txt | qsreplace -a > urls.txt
+    cat raw_urls | qsreplace -a | gf files | httpx -silent -fc 404 -o httpx.txt
+    #cat raw_urls | sort -u | gf files | httpx -no-color -silent -title -status-code -fc 404 -content-length -o httpx.txt  2>/dev/null
+    cat httpx.txt | awk '{print $1}'| sort -u > urls.txt
     touch URL
 }
 
@@ -115,8 +115,9 @@ dal_fox(){
     echo "XSS SCAN ( $1 )"
     echo "#------------------------------------#"
     
-    cat urls.txt | /opt/kxss | awk '{print $NF}' | sed 's/=.*/=/' > kxss.txt
-    cat kxss.txt | dalfox pipe -w 1000  -o $(pwd)/dalfox.txt
+    #cat urls.txt | /opt/kxss | awk '{print $NF}' | sed 's/=.*/=/' > kxss.txt
+    #cat kxss.txt | dalfox pipe -w 1000  -o $(pwd)/dalfox.txt
+    cat urls.txt | gf xss | dalfox pipe -w 1000 -o ./dalfox.txt 
     touch DALFOX
 }
 
@@ -143,7 +144,8 @@ dirfuzz(){
     echo "DIR FUZZING ( $1 )"
     echo "#------------------------------------#"
     
-    /opt/gobuster dir -u $1 -w $fuzzword -o $1_gobuster.txt -q -t 50  2>/dev/null
+    #/opt/gobuster dir -u $1 -w $fuzzword -o $1_gobuster.txt -q -t 50  2>/dev/null
+    ffuf -u $1/FUZZ -w $fuzzword -t 100 -ac -ic -sa -se -sf -o $1_ffuf.txt -s
     touch FUZZ
 }
 
@@ -162,7 +164,6 @@ nmap_scan(){
   echo "#------------------------------------#"
 
   mkdir nmap
-  #sudo nmap --script=vuln -oA nmap/vuln_scan -Pn -p $(cat open_ports.txt) -iL ip.txt
   sudo nmap -sCV -oA nmap/connect_scan -Pn -p $(cat open_ports.txt) -iL ip.txt
 }
 
@@ -171,7 +172,7 @@ s3_scan(){
     echo "S3 SCAN ( $1 )"
     echo "#------------------------------------#"
 
-    python3 /opt/S3Scanner/s3scanner.py -l subdomains.txt -o buckets.txt 2>/dev/null
+    python3 /opt/S3Scanner/s3scanner.py -l subdomains.txt -o buckets.txt 
     touch S3
 }
 
@@ -203,8 +204,8 @@ secret_find(){
     echo "#------------------------------------#"
     echo "SECRETFINDER ( $1 )" 
     echo "#------------------------------------#" 
-    cat raw_urls.txt | grep .js | sort -u > sf.txt
-    python3 /opt/secretfinder/SecretFinder.py -i sf.txt -o secretfinder.html 2>/dev/null 
+    cat raw_urls.txt | grep -E ".*\.js$" | sort -u > sf.txt
+    python3 /opt/secretfinder/SecretFinder.py -i sf.txt -o secretfinder.html 
     touch SECRET
 }
 
@@ -218,8 +219,8 @@ takeover(){
   echo "SUBDOMAIN TAKEOVER ( $1 )" 
   echo "#------------------------------------#" 
   
-  #subjack -w subdomains.txt -t 500 -o subdomain_takeover.txt -ssl -a
-  subzy -targets subdomains.txt | tee subdomain_takeover.txt
+  subjack -w subdomains.txt -t 500 -o subdomain_takeover.txt -ssl -a
+  subzy -https -targets subdomains.txt | tee subdomain_takeover.txt
 }
 
 cleanup(){
